@@ -1,80 +1,38 @@
 package com.sg.fastq;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
 import java.util.zip.GZIPInputStream;
 
-public class GZipUnzip {
+class GZipUnzip {
 
-	public static void main(String[] args) {
+	public static void gunzipFastq(String filename) throws IOException {
 
-		String filename = args[0];
+		// Extra extension check - remove?
+		if (!filename.endsWith(".gz")) { return; }
 
-		System.out.println("Input file name: " + filename);
+		System.out.println();
+		System.out.println("*****************************************************");
+		System.out.println("Unzipping: " + filename);
 
-		try {
+		byte[] buffer = new byte[1024];
 
-			System.out.println();
-			System.out.println("*****************************************************");
-			System.out.println();
-
-			System.out.println("File attributes...");
-
-			File file = new File(filename);
-
-			System.out.println("exists: " + file.exists());
-			System.out.println("getAbsoluteFile: " + file.getAbsoluteFile());
-			System.out.println("getAbsolutePath: " + file.getAbsolutePath());
-			System.out.println("getCanonicalFile: " + file.getCanonicalFile());
-			System.out.println("getCanonicalPath: " + file.getCanonicalPath());
-			System.out.println("getName: " + file.getName());
-			System.out.println("getParent: " + file.getParent());
-			System.out.println("getParentFile: " + file.getParentFile());
-			System.out.println("getPath: " + file.getPath());
-			System.out.println("hashCode: " + file.hashCode());
-			System.out.println("isAbsolute: " + file.isAbsolute());
-			System.out.println("isDirectory: " + file.isDirectory());
-			System.out.println("isFile: " + file.isFile());
-			System.out.println("isHidden: " + file.isHidden());
-			System.out.println("lastModified: " + file.lastModified());
-			System.out.println("length: " + file.length());
-
-			System.out.println();
-			System.out.println("*****************************************************");
-			System.out.println();
-			
-			System.out.println("FileInputStream attributes");
-
+		try (
 			FileInputStream fis = new FileInputStream(filename);
-
-			System.out.println("Class name: " + fis.getClass().getName());
-			System.out.println("Available before: " + fis.available());
-			
-			long start = System.currentTimeMillis();
-			int count = 0;
-			while (fis.read() != -1) {
-				count++;
-			}
-			
-			long timeToRead = System.currentTimeMillis() - start;
-			timeToRead /= 1000;
-			System.out.println("Seconds to read: " + timeToRead); 
-			System.out.println("Byte count: " + count);
-			System.out.println("Available after: " + fis.available());
-			System.out.println("File descriptor (getFD): " + fis.getFD());
-
-			System.out.println();
+			GZIPInputStream gis = new GZIPInputStream(fis);
+			FileOutputStream fos = new FileOutputStream(filename.replaceAll(".gz",""));			
+		) {
+			int len;
+			while ((len = gis.read(buffer)) > 0) {
+				fos.write(buffer, 0, len);
+			}	
+			gis.close();
+			fos.close();
 			System.out.println("*****************************************************");
 			System.out.println();
-
-		} catch (IOException ex) {
-
-			ex.printStackTrace();
-
+	
 		}
 	}
-
 }
