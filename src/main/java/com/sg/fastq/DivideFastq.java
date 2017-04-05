@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.DirectoryStream;
+import java.nio.file.StandardOpenOption;
 
 import java.io.IOException;
 import java.io.BufferedReader;
@@ -36,7 +37,7 @@ class DivideFastq {
 				try (
 					BufferedReader br = Files.newBufferedReader(p, ENCODING);
 				) {
-					String[] line = null;
+					String line = null;
 					while ((line = br.readLine()) != null) {
 						String[] items = line.split(",");
 						String target = items[0];
@@ -56,9 +57,9 @@ class DivideFastq {
 		String id1 = path1.getFileName().toString().substring(0, path1.getFileName().toString().indexOf(".fastq"));
 		String id2 = path2.getFileName().toString().substring(0, path2.getFileName().toString().indexOf(".fastq"));
 		Map<String, Path[]> pathMap = new HashMap<String, Path[]>();
-		for (String target : routes) {
-			Path p1 = Paths.get(clusterPrefix + separator + id1 + target + ".fastq");
-			Path p2 = Paths.get(clusterPrefix + separator + id2 + target + ".fastq");
+		for (String target : routes.keySet()) {
+			Path p1 = Paths.get(clusterPrefix + separator + id1 + "-" + target + ".fastq");
+			Path p2 = Paths.get(clusterPrefix + separator + id2 + "-" + target + ".fastq");
 			pathMap.put(target, new Path[]{p1,p2});
 		}
 
@@ -66,7 +67,7 @@ class DivideFastq {
 		List<String> names = new ArrayList<String>();
 		List<String> sequences = new ArrayList<String>();
 		try (
-			DirectoryStream<Path> stream = Files.newDirectoryStream(primerPath, "*list.csv")
+			DirectoryStream<Path> stream = Files.newDirectoryStream(primerListPath, "*list.csv")
 		) {
 			for (Path p : stream) {
 				try (
@@ -83,6 +84,7 @@ class DivideFastq {
 		}		
 			
 		// Read files, looking at the corresponding R1 and R2 sequences together 
+		int count = 0;
 		System.out.println();
 		System.out.println("------Start clustering: " + path1.getFileName().toString());
 		System.out.println("------Start clustering: " + path2.getFileName().toString());
@@ -101,9 +103,10 @@ class DivideFastq {
 				String seq2 = br2.readLine();
 				
 				// Check for exact matches to primer sequences
-				String p1 = checkForPrimer(names, sequences, counts, seq1);
-				String p2 = checkForPrimer(names, sequences, counts, seq2);
+				String p1 = checkForPrimer(names, sequences, seq1);
+				String p2 = checkForPrimer(names, sequences, seq2);
 
+				// Read target in primer name
 				String target1 = !p1.equals(NONE) ? p1.split("-")[0] + "-" + p1.split("-")[1] : NONE;
 				String target2 = !p2.equals(NONE) ? p2.split("-")[0] + "-" + p2.split("-")[1] : NONE;
 
@@ -115,63 +118,49 @@ class DivideFastq {
 				String quality1 = br1.readLine();
 				String quality2 = br2.readLine();
 
+				// Test: allocate reads directly by full pairs
+				if (target1.equals(target2) && !target1.toLowerCase().equals(NONE)) {
+					StandardOpenOption oo = StandardOpenOption.APPEND;
+					if (!Files.exists(pathMap.get(target1)[0])) {
+						oo = StandardOpenOption.CREATE;
+					}
+					try (
+						BufferedWriter bw1 = Files.newBufferedWriter(pathMap.get(target1)[0], ENCODING, oo);				
+						BufferedWriter bw2 = Files.newBufferedWriter(pathMap.get(target1)[1], ENCODING, oo);				
+					) {
+						bw1.write(header1);
+						bw1.newLine();
+						bw1.write(seq1);
+						bw1.newLine();
+						bw1.write(plus1);
+						bw1.newLine();
+						bw1.write(quality1);
+						bw1.newLine();
+						bw2.write(header2);
+						bw2.newLine();
+						bw2.write(seq2);
+						bw2.newLine();
+						bw2.write(plus2);
+						bw2.newLine();
+						bw2.write(quality2);
+						bw2.newLine();
+					}
+				}
+
 				count++;
 			}
 		}
-		System.out.println("----------Clustering Done: " + path1.getFileName().toString());
-		System.out.println("----------Clustering Done: " + path2.getFileName().toString());
-		System.out.println("--------Sequences Checked: " + count);
+		System.out.println("--------Clustering Done: " + path1.getFileName().toString());
+		System.out.println("--------Clustering Done: " + path2.getFileName().toString());
+		System.out.println("------Sequences Checked: " + count);
 		System.out.println();
-
-		// Write the count file.txt
-		String primerPrefix = primerCountPath.toString();
-		String targetPrefix = targetCountPath.toString();
-		String byPrimer = primerPrefix + separator + id + "-primers.csv";
-		String byTarget = targetPrefix + separator + id + "-targets.csv";
-		Path byPrimerPath = Paths.get(byPrimer);
-		Path byTargetPath = Paths.get(byTarget);
-		try (
-			BufferedWriter bwPrimer = Files.newBufferedWriter(byPrimerPath, ENCODING);
-			BufferedWriter bwTarget = Files.newBufferedWriter(byTargetPath, ENCODING);
-		) {
-			String newLine = System.getProperty("line.separator");
-
-			// Put the target counts into a hashmap, keyed by target, "e.g., A-2"
-			Map<String, Integer> targetCounts = new HashMap<String, Integer>();
-
-			for (int i = 1; i < counts.length; i++) {
-				String name = names.get(i);
-				String line = name + "," + sequences.get(i) + "," + counts[i];
-				line += newLine;
-				// Write to bwPrimer
-				bwPrimer.write(line, 0, line.length());
-
-				// Populate targetCounts map
-				// Target is the String preceding the second "-"
-				String[] items = name.split("-");
-				String target = items[0] + "-" + items[1];
-				if (!targetCounts.containsKey(target)) {
-					targetCounts.put(target, 0);
-				}
-				// Add individual primer count to total
-				targetCounts.put(target, targetCounts.get(target)+counts[i]);
-			}
-			// Write to bwTarget
-			// Iterate the entries in sorted order
-			Map<String, Integer> sortedTargetCounts = new TreeMap<String, Integer>(targetCounts);
-			for (Map.Entry<String, Integer> entry : targetCounts.entrySet()) {
-				String line = entry.getKey() + "," + entry.getValue() + newLine;
-				bwTarget.write(line, 0, line.length());
-			}
-		}
 	}
-	
+
 	// Search for exact matches and increment the count array
-	private static String checkForPrimer(List<String> names, List<String> sequences, int[] counts, String read) {
+	private static String checkForPrimer(List<String> names, List<String> sequences, String read) {
 		for (int i = 0; i < sequences.size(); i++) {
 			if (read.substring(0, PRIMER_REGION).contains(sequences.get(i))
 					|| read.substring(0, PRIMER_REGION).contains(revComp(sequences.get(i)))) {
-				counts[i]++;
 				return names.get(i);
 			}
 		}

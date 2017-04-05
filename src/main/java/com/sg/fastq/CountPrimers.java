@@ -24,13 +24,13 @@ class CountPrimers {
 	private final static int PRIMER_REGION = 30;
 	private final static String NONE = "none";
 
-	public static void countPrimers (Path primerPath, Path path1, Path path2, Path primerCountPath, Path targetCountPath) throws IOException {
+	public static void countPrimers (Path primerListPath, Path path1, Path path2, Path primerCountPath, Path targetCountPath) throws IOException {
 
 		// Read the primer files data into arrays
 		List<String> names = new ArrayList<String>();
 		List<String> sequences = new ArrayList<String>();
 		try (
-			DirectoryStream<Path> stream = Files.newDirectoryStream(primerPath, "*.csv")
+			DirectoryStream<Path> stream = Files.newDirectoryStream(primerListPath, "*list.csv")
 		) {
 			for (Path p : stream) {
 				try (

@@ -66,6 +66,7 @@ class ProcessFastq {
 					firstOfPair = p;
 				} else if (isAPair(firstOfPair.toString(), p.toString())) {
 					CountPrimers.countPrimers(primerPath, firstOfPair, p, primerCountPath, targetCountPath);
+					DivideFastq.divideFastq(primerPath, primerPath, firstOfPair, p, clusterPath);
 					firstOfPair = null;
 				}
 			}
