@@ -71,6 +71,15 @@ class ProcessFastq {
 				}
 			}
 		}
+
+		// Delete sample fastq files
+		try (
+			DirectoryStream<Path> stream = Files.newDirectoryStream(fastqPath,"*.fastq")
+		) {
+			for (Path p : stream) {
+				Files.delete(p);
+			}
+		}
 	}
 	private static boolean isAPair(String read1, String read2) {
 		int index1;
